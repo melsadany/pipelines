@@ -1,0 +1,23 @@
+#! /bin/bash
+#$ -cwd
+#$ -q JM,CCOM,UI
+#$ -pe smp 56
+#$ -N make-GRMs
+#$ -m eas
+#$ -M muhammad-elsadany@uiowa.edu
+#$ -o $JOB_NAME.log
+#$ -j y
+#$ -ckpt user
+
+
+OUT_DIR=/Dedicated/jmichaelson-wdata/msmuhammad/scratch/GWAS/GCTA/GRMs
+mkdir -p ${OUT_DIR}
+
+/Dedicated/jmichaelson-wdata/trthomas/bin/gcta/gcta_1.93.2beta/gcta64 \
+  --make-grm \
+  --bfile /Dedicated/jmichaelson-wdata/trthomas/array/merged_2022_ABCD_iWES1_WGS_2-4/genotypes/final \
+  --autosome \
+  --thread-num 56 \
+  --out ${OUT_DIR}
+
+echo 'done with making GRMs'
