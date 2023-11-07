@@ -36,7 +36,9 @@ subset_genotypes <- function(genotypes_path_base_name,
                              tissue = T, 
                              celltype = F, 
                              tissue_type = "brain",
+                             celltype_type = "all", 
                              build = "hg19",
+                             with_chr = T,
                              verbose = T) {
   #' @description This function subsets the huge genotypes bed file
   #' to only keeps genotypes of interest for the selected tissues or celltypes
@@ -45,19 +47,23 @@ subset_genotypes <- function(genotypes_path_base_name,
   #' @param project_dir character. give this the main project directory that you want to save files at. 
   #' the function will build data/derivatives/genotypes-subset directory inside this directory by default
   #' @param tissue_type logical. This to identify if you want to subset genotypes for a tissue or not. default = T.
+  #' @param celltype_type character. this is to identify if you just want certain celltype or all tissues from GTEx or a specific tissue. either "brain" or "all". default = "all"
   #' @param celltype logical. This to identify if you want to subset genotypes for a celltype or not. default = F.
   #' @param tissue character. this is to identify if you just want brain tissues or all tissues from GTEx or a specific tissue. either "brain" or "all". default = "brain"
   #' @param build character. this identifies if your genotypes build is in "hg19" or not. 
+  #' @param with_chr logical. this indicates the naming format for the variants in the genotypes BED file. TRUE means the genotype is names in this format: chr4:101668718:A:G, and FALSE means it's named in this format 4:101668718:A:G
   #' @param verbose logical. print messages or not. 
   #' 
   #' @return the function does not return anything. it saves the subsetted genotypes by default
   
   if (tissue == T) {
     tissues <- c("Adipose_Subcutaneous", "Adipose_Visceral_Omentum", "Adrenal_Gland", "Artery_Aorta", "Artery_Coronary", "Artery_Tibial", "Brain_Anterior_cingulate_cortex_BA24", "Brain_Caudate_basal_ganglia", "Brain_Cerebellar_Hemisphere", "Brain_Cerebellum", "Brain_Cortex", "Brain_Frontal_Cortex_BA9", "Brain_Hippocampus", "Brain_Hypothalamus", "Brain_Nucleus_accumbens_basal_ganglia", "Brain_Putamen_basal_ganglia", "Breast_Mammary_Tissue", "Cells_EBV-transformed_lymphocytes", "Cells_Transformed_fibroblasts", "Colon_Sigmoid", "Colon_Transverse", "Esophagus_Gastroesophageal_Junction", "Esophagus_Mucosa", "Esophagus_Muscularis", "Heart_Atrial_Appendage", "Heart_Left_Ventricle", "Liver", "Lung", "Muscle_Skeletal", "Nerve_Tibial", "Ovary", "Pancreas", "Pituitary", "Prostate", "Skin_Not_Sun_Exposed_Suprapubic", "Skin_Sun_Exposed_Lower_leg", "Small_Intestine_Terminal_Ileum", "Spleen", "Stomach", "Testis", "Thyroid", "Uterus", "Vagina", "Whole_Blood")
-    if (tissue_type == "brain") {
-      tissues <- tissues[7:16]
-    } else if (tissue_type == "all") {
-      tissues <- tissues
+    if (length(tissue_type) == 1) {
+      if (tissue_type == "brain") {
+        tissues <- tissues[7:16]
+      } else if (tissue_type == "all") {
+        tissues <- tissues
+      }
     } else {
       tissues <- tissue_type
     }
@@ -66,7 +72,12 @@ subset_genotypes <- function(genotypes_path_base_name,
       tissue <- tissues[i]
       weights.path <- "/Dedicated/jmichaelson-wdata/msmuhammad/data/UTMOST-GTEx-model-weights/tmp/"
       if (build == "hg19") {
-        ids <- paste0(weights.path, "rsid-ID02-UTMOST-for-", tissue)
+        if (with_chr == T) {
+          ids <- paste0(weights.path, "rsid-ID02-UTMOST-for-", tissue)
+        } else {
+          ids <- paste0(weights.path, "rsid-ID02-UTMOST-no-chr-for-", tissue)
+        }
+        
         gcta_command <- paste(
           "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/gcta/gcta-1.94.1", # GCTA executable
           "--bfile", genotypes_path_base_name, #PLINK files
@@ -88,13 +99,23 @@ subset_genotypes <- function(genotypes_path_base_name,
   if (celltype == T) {
     # print("pipeline not ready")
     celltypes <- c("Excitatory", "Astrocytes", "Endothelial", "Inhibitory", "Microglia", "Oligodendrocytes", "OPCs", "Pericytes", "pb")
-    
+    if (length(celltype_type) ==1) {
+      if (celltype_type == "all") {
+        celltypes <- celltypes
+      } 
+    } else {
+      celltypes <- celltype_type
+    }
     registerDoMC(cores = 6)
     foreach::foreach(i = 1:length(celltypes)) %dopar% {
       celltype <- celltypes[i]
       weights.path <- "/Dedicated/jmichaelson-wdata/msmuhammad/data/celltypes-cis-eQTLs/data/derivatives/"
       if (build == "hg19") {
-        ids <- paste0(weights.path, celltype, "-ID_37-FDR-sig")
+        if (with_chr == T) {
+          ids <- paste0(weights.path, celltype, "-ID_37-FDR")
+        } else {
+          ids <- paste0(weights.path, celltype, "-ID_37-FDR-no-chr")
+        }
         gcta_command <- paste(
           "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/gcta/gcta-1.94.1", # GCTA executable
           "--bfile", genotypes_path_base_name, #PLINK files
@@ -114,6 +135,7 @@ subset_genotypes <- function(genotypes_path_base_name,
       
   }
   }
+}
 #####
 ################################################################################
 ################################################################################
@@ -123,9 +145,10 @@ impute.tx <- function(project_dir,
                       tissue = T, 
                       celltype = F, 
                       tissue_type = "brain",
-                      celtype_type = "all", 
+                      celltype_type = "all", 
                       build = "hg19",
                       verbose = T, 
+                      with_chr = T,
                       threads = 6) {
   #' @description This function imputes transcriptome for selected tissue using genotypes subset
   #'
@@ -138,16 +161,19 @@ impute.tx <- function(project_dir,
   #' @param celltype_type character. this is to identify if you just want certain celltype or all tissues from GTEx or a specific tissue. either "brain" or "all". default = "all"
   #' @param build character. this identifies if your genotypes build is in "hg19" or not. 
   #' @param verbose logical. print messages or not. 
+  #' @param with_chr logical. this indicates the naming format for the variants in the genotypes BED file. TRUE means the genotype is names in this format: chr4:101668718:A:G, and FALSE means it's named in this format 4:101668718:A:G
   #' @param threads integer. number of threads to use
   #' 
   #' @return the function does not return anything. it saves the imputed-tx by default
   
   if (tissue == T) {
     tissues <- c("Adipose_Subcutaneous", "Adipose_Visceral_Omentum", "Adrenal_Gland", "Artery_Aorta", "Artery_Coronary", "Artery_Tibial", "Brain_Anterior_cingulate_cortex_BA24", "Brain_Caudate_basal_ganglia", "Brain_Cerebellar_Hemisphere", "Brain_Cerebellum", "Brain_Cortex", "Brain_Frontal_Cortex_BA9", "Brain_Hippocampus", "Brain_Hypothalamus", "Brain_Nucleus_accumbens_basal_ganglia", "Brain_Putamen_basal_ganglia", "Breast_Mammary_Tissue", "Cells_EBV-transformed_lymphocytes", "Cells_Transformed_fibroblasts", "Colon_Sigmoid", "Colon_Transverse", "Esophagus_Gastroesophageal_Junction", "Esophagus_Mucosa", "Esophagus_Muscularis", "Heart_Atrial_Appendage", "Heart_Left_Ventricle", "Liver", "Lung", "Muscle_Skeletal", "Nerve_Tibial", "Ovary", "Pancreas", "Pituitary", "Prostate", "Skin_Not_Sun_Exposed_Suprapubic", "Skin_Sun_Exposed_Lower_leg", "Small_Intestine_Terminal_Ileum", "Spleen", "Stomach", "Testis", "Thyroid", "Uterus", "Vagina", "Whole_Blood")
-    if (tissue_type == "brain") {
-      tissues <- tissues[7:16]
-    } else if (tissue_type == "all") {
-      tissues <- tissues
+    if (length(tissue_type) == 1) {
+      if (tissue_type == "brain") {
+        tissues <- tissues[7:16]
+      } else if (tissue_type == "all") {
+        tissues <- tissues
+      }
     } else {
       tissues <- tissue_type
     }
@@ -167,10 +193,18 @@ impute.tx <- function(project_dir,
         
         # get tissue weights
         tissue.weights <- read.table(paste0(weights.path, "rsid-for-", tissue), row.names = 1)
-        ready.weights <- tissue.weights %>% 
-          dplyr::select(variant = ID_02_UTMOST, gene, weight) %>%
-          distinct(variant, gene, .keep_all = T) %>%
-          filter(variant %in% colnames(genotypes))
+        if (with_chr == F) {
+          ready.weights <- tissue.weights %>% 
+            mutate(ID_02_UTMOST = sub("chr", "", ID_02_UTMOST)) %>%
+            dplyr::select(variant = ID_02_UTMOST, gene, weight) %>%
+            distinct(variant, gene, .keep_all = T) %>%
+            filter(variant %in% colnames(genotypes))
+        } else {
+          ready.weights <- tissue.weights %>% 
+            dplyr::select(variant = ID_02_UTMOST, gene, weight) %>%
+            distinct(variant, gene, .keep_all = T) %>%
+            filter(variant %in% colnames(genotypes))
+        }
         gc()
         ifelse(verbose, print(paste0("Done reading weights file for tissue: ", tissue)), NULL)
         system(paste0("mkdir -p ", project_dir, "/data/derivatives/imputed-tx/"))
@@ -207,8 +241,10 @@ impute.tx <- function(project_dir,
   if (celltype == T) {
     # print("pipeline not ready")
     celltypes <- c("Excitatory", "Astrocytes", "Endothelial", "Inhibitory", "Microglia", "Oligodendrocytes", "OPCs", "Pericytes", "pb")
-    if (celltype_type == "all") {
-      celltypes <- celltypes
+    if (length(celltype_type) ==1) {
+      if (celltype_type == "all") {
+        celltypes <- celltypes
+      } 
     } else {
       celltypes <- celltype_type
     }
@@ -229,11 +265,20 @@ impute.tx <- function(project_dir,
         
         # get celltype weights
         celltype.weights <- read_rds(paste0(weights.path, celltype, "-weights-fdr-sig.rds"))
-        ready.weights <- celltype.weights %>% 
-          filter(FDR<0.05) %>%
-          dplyr::select(variant=ID_37, gene, weight=beta) %>%
-          distinct(variant, gene, .keep_all = T) %>%
-          filter(variant %in% colnames(genotypes))
+        if (with_chr == F) {
+          ready.weights <- celltype.weights %>% 
+            filter(FDR<0.05) %>%
+            mutate(ID_37 = sub("chr", "", ID_37)) %>%
+            dplyr::select(variant=ID_37, gene, weight=beta) %>%
+            distinct(variant, gene, .keep_all = T) %>%
+            filter(variant %in% colnames(genotypes))
+        } else {
+          ready.weights <- celltype.weights %>% 
+            filter(FDR<0.05) %>%
+            dplyr::select(variant=ID_37, gene, weight=beta) %>%
+            distinct(variant, gene, .keep_all = T) %>%
+            filter(variant %in% colnames(genotypes))
+        }
         gc()
         ifelse(verbose, print(paste0("Done reading weights file for celltype: ", celltype)), NULL)
         system(paste0("mkdir -p ", project_dir, "/data/derivatives/imputed-tx/"))
@@ -258,7 +303,7 @@ impute.tx <- function(project_dir,
           gene.weights <- filt.weights %>% filter(gene%in%gen) %>%
             pivot_wider(names_from = "variant", values_from = "weight") %>%
             column_to_rownames("gene")
-          imp <- as.matrix(filt.genotypes[,colnames(gene.weights)]) %*% t(gene.weights)
+          imp <- as.matrix(filt.genotypes[,colnames(filt.genotypes) %in% colnames(gene.weights)]) %*% t(gene.weights)
           return(imp)
         }
         pdssave(imputed, file = paste0(project_dir, "/data/derivatives/imputed-tx/", 
@@ -266,7 +311,6 @@ impute.tx <- function(project_dir,
         ifelse(verbose, print(paste0("done imputing tx for celltype: ", celltype)), NULL)
       }
     }
-  }
   }
 }
 #####

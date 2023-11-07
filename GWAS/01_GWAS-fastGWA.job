@@ -1,0 +1,91 @@
+#! /bin/bash
+#$ -cwd
+#$ -q JM,UI,CCOM
+#$ -pe smp 56
+#$ -l mf=128G
+#$ -N fastGWA
+#$ -o logs/$JOB_NAME.log
+#$ -j y
+#$ -ckpt user
+
+## -------------------------------
+#### prep files / environment ####
+## -------------------------------
+TC=16 ## num threads
+## makes individual phenotype files in an independent script before running this
+
+## paths to tools
+GCTA=/Dedicated/jmichaelson-wdata/msmuhammad/workbench/gcta/gcta-1.94.1 ## path to GCTA executable
+PLINK=/Dedicated/jmichaelson-wdata/msmuhammad/workbench/plink/plink
+
+## paths to data
+GENO=/Dedicated/jmichaelson-wdata/trthomas/array/merged_2022_ABCD_iWES1_WGS_2-4/genotypes/final ## path to bed file basename
+QCOV=/Dedicated/jmichaelson-wdata/lcasten/abcd/sli_gwas/covariates/fastGWA_qcovar.txt ## path to quantitative covariates. i.e., 20 genetic PCs
+COV=/Dedicated/jmichaelson-wdata/lcasten/abcd/sli_gwas/covariates/fastGWA_covar.txt ## path to covariates. i.e., population stratification
+# GRM="/Dedicated/jmichaelson-wdata/trthomas/array/merged_2022_ABCD_iWES1_WGS_2-4/GCTA/all"
+SPGRM="/Dedicated/jmichaelson-wdata/lcasten/abcd/sli_gwas/grm/all_grm_sparse.05"
+
+## --------------------------------------------------
+#### make necessary files (e.g., pheno, plink binary fileset) ####
+## --------------------------------------------------
+
+## ----------------------
+#### make sparse GRM ####
+## ----------------------
+# $GCTA --grm $GRM \
+#   --make-bK-sparse 0.05 \
+#   --out $SPGRM
+
+## -------------------------------------------
+#### run GCTA GWAS - loop over phenotype files ####
+## -------------------------------------------
+## get all phenotype files
+cd /Dedicated/jmichaelson-wdata/lcasten/abcd/sli_gwas/phenotypes/fastGWA
+files=(*.txt)
+
+## run for loop
+for PHENONAME in "${files[@]}"
+do
+    echo "------------------------"
+    echo "working on $PHENONAME..."
+    echo "------------------------"
+
+    PHENO="/Dedicated/jmichaelson-wdata/lcasten/abcd/sli_gwas/phenotypes/fastGWA/$PHENONAME"
+    OUT="/Dedicated/jmichaelson-wdata/lcasten/abcd/sli_gwas/results/$PHENONAME"
+
+    $GCTA \
+        --bfile $GENO \
+        --grm-sparse $SPGRM \
+        --fastGWA-mlm \
+        --pheno $PHENO \
+        --qcovar $QCOV \
+        --covar $COV \
+        --seed 1010 \
+        --thread-num $TC \
+        --out $OUT
+done
+
+## code for running fastGWA on binary trait
+files=("sli_top_decile.individual_items_regressed.txt" "sli_top_decile.total_regressed.txt")
+## run for loop
+for PHENONAME in "${files[@]}"
+do
+  echo "------------------------"
+  echo "working on $PHENONAME..."
+  echo "------------------------"
+  PHENO="/Dedicated/jmichaelson-wdata/lcasten/abcd/sli_gwas/phenotypes/fastGWA/$PHENONAME"
+  OUT="/Dedicated/jmichaelson-wdata/lcasten/abcd/sli_gwas/results/$PHENONAME"
+  
+  $GCTA \
+      --bfile $GENO \
+      --grm-sparse $SPGRM \
+      --fastGWA-mlm-binary \
+      --pheno $PHENO \
+      --qcovar $QCOV \
+      --covar $COV \
+      --seed 1010 \
+      --thread-num $TC \
+      --out $OUT
+done
+
+## done, look at results in R
