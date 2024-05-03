@@ -11,12 +11,14 @@ if (argon == T) {
   cores <- as.numeric(args[2])
   bed.path <- args[3]
   output.dir <- args[4]
+  project.dir <- args[5]
   message(paste0("here's the id: ", id, " and here's the cores' number: ", cores, " and here's the bed file path :",
                  bed.path, " and here's the output dir path: ", output.dir))
+} else {
+  project.dir <- "/Dedicated/jmichaelson-wdata/msmuhammad/projects/RPOE/genetics"
 }
 ################################################################################
 ################################################################################
-project.dir <- "/Dedicated/jmichaelson-wdata/msmuhammad/projects/RPOE/genetics"
 setwd(project.dir)
 ################################################################################
 ################################################################################
@@ -44,7 +46,10 @@ calc_pgs_ME_V(bed_filepath = bed.path,
               build = "hg19", 
               output_directory = output.dir, # will save a tsv file for each PGS
               ss.meta = ss.meta, # give it the list of PGS scores you want
+              sd = ifelse(is.na(ss.meta$sd[1]), 0, ss.meta$sd[1]),
               combine = F) # this is to combine the PGS at the end or not. it will make a wide dataframe for combining all PGS files in the output directory
+# clean and remove tmp files
+system(paste0("rm -rf ", project.dir, "/tmp-", ss.meta[1,1]))
 ################################################################################
 ################################################################################
 ################################################################################
