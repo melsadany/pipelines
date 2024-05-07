@@ -39,7 +39,7 @@ if (argon==T) {
 }
 ####
 # load my PGS calc function
-source("/Dedicated/jmichaelson-wdata/msmuhammad/workbench/customized-functions/calc_pgs_ME_V.R")
+source("/Dedicated/jmichaelson-wdata/msmuhammad/pipelines/PGS/calc_pgs_ME_V.R")
 
 calc_pgs_ME_V(bed_filepath = bed.path,
               n_cores = cores, 
