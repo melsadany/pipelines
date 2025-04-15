@@ -17,6 +17,7 @@
 ####
 # my function to run ldpred and out pgs by trait
 calc_pgs_ME_V <- function(bed_filepath,
+                          device,
                           build = "hg19",
                           output_directory = "PGS-output",
                           n_cores = 1,
@@ -27,9 +28,12 @@ calc_pgs_ME_V <- function(bed_filepath,
   system(paste0("mkdir -p ", output_directory))
   
   #### get LDPred2 function ####
-  source("/Dedicated/jmichaelson-wdata/msmuhammad/workbench/customized-functions/LDPred2_argon_hm3plus_ME.R")
-  map_ld = read_rds('/Dedicated/jmichaelson-wdata/lcasten/tools/LDPred2/map_hm3_plus.rds')
-  map_ldref = read_rds('/Dedicated/jmichaelson-wdata/lcasten/tools/LDPred2/map_hm3_plus.rds')
+  source(paste0(ifelse(device == "IDAS", "~/LSS", "/Dedicated"),
+                "/jmichaelson-wdata/msmuhammad/workbench/customized-functions/LDPred2_argon_hm3plus_ME.R"))
+  map_ld = read_rds(paste0(ifelse(device == "IDAS", "~/LSS", "/Dedicated"),
+                           '/jmichaelson-wdata/lcasten/tools/LDPred2/map_hm3_plus.rds'))
+  map_ldref = read_rds(paste0(ifelse(device == "IDAS", "~/LSS", "/Dedicated"),
+                              '/jmichaelson-wdata/lcasten/tools/LDPred2/map_hm3_plus.rds'))
   ####
   
   #### next chunk is from Lucas Casten ####
@@ -58,8 +62,9 @@ calc_pgs_ME_V <- function(bed_filepath,
   }
   
   ##### loop over these summary stats and calculate the PGS #####
-  registerDoMC(cores=n_cores)
-  foreach(i = 1:nrow(ss.meta)) %dopar% {
+  # registerDoMC(cores=n_cores)
+  # foreach(i = 1:nrow(ss.meta)) %dopar% {
+  for(i in 1:nrow(ss.meta)) {
     phenotype = ss.meta$phenotype[i]
     print(paste0("Started working on phenotype: ", phenotype, 
                  " from: ", ss.meta$source[i], " done at: ", ss.meta$year[i]))
@@ -72,6 +77,7 @@ calc_pgs_ME_V <- function(bed_filepath,
     ###
     print(paste0("PGS calc mark for: ", phenotype))
     calculate_ldpred_pgs(sumstats = ss.f,
+                         device = device,
                          plink_rds = rds.path,
                          sd_y = sd,
                          pheno_name = paste0(ss.meta$source[i], "_", phenotype, "_", ss.meta$year[i]),

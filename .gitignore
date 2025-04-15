@@ -2,3 +2,9 @@ PGS/data
 PGS/archive
 low-pass-WGS-variant-calling/data
 low-pass-WGS-variant-calling/archive
+MRI/anat/data
+MRI/anat/archive
+MRI/func/data
+MRI/func/archive
+MRI/dwi/data
+MRI/dwi/archive

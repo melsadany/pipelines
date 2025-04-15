@@ -5,11 +5,11 @@
 gc()
 # .libPaths("/Users/msmuhammad/workbench/miniconda3/envs/tximpute2/lib/R/library")
 # source("/Dedicated/jmichaelson-wdata/msmuhammad/msmuhammad-source.R")
-library(tidyverse, lib.loc = "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/miniconda3/envs/tximpute/lib/R/library")
-library(doMC, lib.loc = "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/miniconda3/envs/tximpute/lib/R/library")
-library(readr, lib.loc = "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/miniconda3/envs/tximpute/lib/R/library")
-library(data.table, lib.loc = "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/miniconda3/envs/tximpute/lib/R/library")
-registerDoMC(cores = 6)
+# library(tidyverse, lib.loc = "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/miniconda3/envs/tximpute/lib/R/library")
+# library(doMC, lib.loc = "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/miniconda3/envs/tximpute/lib/R/library")
+# library(readr, lib.loc = "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/miniconda3/envs/tximpute/lib/R/library")
+# library(data.table, lib.loc = "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/miniconda3/envs/tximpute/lib/R/library")
+# registerDoMC(cores = 6)
 ################################################################################
 ################################################################################
 # functions you need
@@ -39,7 +39,9 @@ subset_genotypes <- function(genotypes_path_base_name,
                              celltype_type = "all", 
                              build = "hg19",
                              with_chr = T,
-                             verbose = T) {
+                             verbose = T,
+                             run=T, 
+                             threads = 2) {
   #' @description This function subsets the huge genotypes bed file
   #' to only keeps genotypes of interest for the selected tissues or celltypes
   #'
@@ -53,6 +55,8 @@ subset_genotypes <- function(genotypes_path_base_name,
   #' @param build character. this identifies if your genotypes build is in "hg19" or not. 
   #' @param with_chr logical. this indicates the naming format for the variants in the genotypes BED file. TRUE means the genotype is names in this format: chr4:101668718:A:G, and FALSE means it's named in this format 4:101668718:A:G
   #' @param verbose logical. print messages or not. 
+  #' @param run whether to run the subsetting or just return the GCTA commands
+  #' @param threads number of threads to be used in the GCTA command
   #' 
   #' @return the function does not return anything. it saves the subsetted genotypes by default
   
@@ -68,7 +72,7 @@ subset_genotypes <- function(genotypes_path_base_name,
       tissues <- tissue_type
     }
     registerDoMC(cores = 6)
-    foreach::foreach(i = 1:length(tissues)) %dopar% {
+    comm1 <- foreach::foreach(i = 1:length(tissues), .combine = rbind) %dopar% {
       tissue <- tissues[i]
       weights.path <- "/Dedicated/jmichaelson-wdata/msmuhammad/data/UTMOST-GTEx-model-weights/tmp/"
       if (build == "hg19") {
@@ -82,20 +86,28 @@ subset_genotypes <- function(genotypes_path_base_name,
           "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/gcta/gcta-1.94.1", # GCTA executable
           "--bfile", genotypes_path_base_name, #PLINK files
           "--extract", ids, #list of SNPs
-          "--thread-num", 2, # threads
+          "--thread-num", threads, # threads
           "--recode",
           "--out", paste0(project_dir, "/data/derivatives/genotypes-subset/", tissue),
           sep = " ")
         system(paste0("mkdir -p ", project_dir, "/data/derivatives/genotypes-subset/"))
-        ifelse(verbose, print(paste0("this is the GCTA command for tissue: ", 
-                                     tissue, "\n",
-                                     gcta_command)),
-               NULL)
-        system(gcta_command)
-        ifelse(verbose, print(paste0("done subsetting for tissue: ", tissue)), NULL)
+        # ifelse(verbose, print(paste0("this is the GCTA command for tissue: ", 
+        #                              tissue, " ",
+        #                              gcta_command)),
+        #        NULL)
+        if (run == T) {
+          system(gcta_command)
+          ifelse(verbose, print(paste0("done subsetting for tissue: ", tissue)), NULL)
+          return(T)
+        } else {
+          #gcta_command1 <- gcta_command
+          return(gcta_command)
+        }
+        
       }
     }
   }
+  comm2 <- NULL
   if (celltype == T) {
     # print("pipeline not ready")
     celltypes <- c("Excitatory", "Astrocytes", "Endothelial", "Inhibitory", "Microglia", "Oligodendrocytes", "OPCs", "Pericytes", "pb")
@@ -107,7 +119,7 @@ subset_genotypes <- function(genotypes_path_base_name,
       celltypes <- celltype_type
     }
     registerDoMC(cores = 6)
-    foreach::foreach(i = 1:length(celltypes)) %dopar% {
+    comm2 <- foreach::foreach(i = 1:length(celltypes), .combine = rbind) %dopar% {
       celltype <- celltypes[i]
       weights.path <- "/Dedicated/jmichaelson-wdata/msmuhammad/data/celltypes-cis-eQTLs/data/derivatives/"
       if (build == "hg19") {
@@ -120,21 +132,27 @@ subset_genotypes <- function(genotypes_path_base_name,
           "/Dedicated/jmichaelson-wdata/msmuhammad/workbench/gcta/gcta-1.94.1", # GCTA executable
           "--bfile", genotypes_path_base_name, #PLINK files
           "--extract", ids, #list of SNPs
-          "--thread-num", 2, # threads
+          "--thread-num", threads, # threads
           "--recode",
           "--out", paste0(project_dir, "/data/derivatives/genotypes-subset/", celltype),
           sep = " ")
         system(paste0("mkdir -p ", project_dir, "/data/derivatives/genotypes-subset/"))
-        ifelse(verbose, print(paste0("this is the GCTA command for celltype: ", 
-                                     celltype, "\n",
-                                     gcta_command)),
-               NULL)
-        system(gcta_command)
-        ifelse(verbose, print(paste0("done subsetting for celltype: ", celltype)), NULL)
+        # ifelse(verbose, print(paste0("this is the GCTA command for celltype: ", 
+        #                              celltype, "\n",
+        #                              gcta_command)),
+        #        NULL)
+        if (run == T) {
+          system(gcta_command)
+          ifelse(verbose, print(paste0("done subsetting for celltype: ", celltype)), NULL)
+          return(T)
+        } else {
+          gcta_command2 <- gcta_command
+          return(gcta_command2)
+        }
       }
-      
   }
   }
+  return(rbind(comm1, comm2))
 }
 #####
 ################################################################################
@@ -222,6 +240,7 @@ impute.tx <- function(project_dir,
         
         filt.weights <- ready.weights %>%
           filter(variant %in% ge)
+        rm(genotypes)
         gc()
         imputed <- foreach(j=1:length(unique(filt.weights$gene)), .combine = cbind) %dopar% {
           # j=1
