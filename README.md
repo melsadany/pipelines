@@ -48,7 +48,3 @@ A collection of customized pipelines for deep learning, genomics, neuroimaging, 
 - **Location**: `tx-imputation/`
 - **Description**: Tissue-specific transcriptome imputation using genotype and eQTL data
 - **Features**: Multiple tissue models, prediction accuracy assessment
-
-
-# Or use Docker
-docker pull yourusername/pipelines:latest
